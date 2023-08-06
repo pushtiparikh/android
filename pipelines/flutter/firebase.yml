@@ -1,0 +1,38 @@
+variables:
+  APP_DISTRIBUTION: "True"
+
+.job_template: &firebase_upload
+  stage: firebase
+  script:
+    - |
+      #!/bin/bash
+      APPLICATION_ID="${PLATFORM}_${FLAVOR}_${PROFILE}"
+      echo "Taking input variable: ${APPLICATION_ID}"
+      if [ "${PLATFORM}" = "android" ]; then
+        firebase appdistribution:distribute artifact/${PROJECT_NAME}-${FLAVOR}-${PROFILE}.apk --app "${!APPLICATION_ID}" --groups "${TESTER_GROUP}" --release-notes "Android Debug build" --token "${TOKEN}"
+      elif [ "${PLATFORM}" = "ios" ]; then
+        firebase appdistribution:distribute artifact/${PROJECT_NAME}-${FLAVOR}-${PROFILE}.ipa --app "${!APPLICATION_ID}" --groups "${TESTER_GROUP}" --release-notes "iOS Debug build" --token "${TOKEN}"
+      fi
+    - echo "Artifact Uploaded with Time Stamp - $(TZ=UTC-5:30 date -R) with Timezone UTC+5:30"
+  only:
+    variables:
+      - $APP_DISTRIBUTION == "True"
+  tags:
+    - flutter 
+  when: manual
+
+firebase:android:debug:
+  variables:
+    PLATFORM: android
+    PROFILE: debug
+  <<: *firebase_upload
+  dependencies:
+    - android:debug
+
+firebase:ios:debug:
+  variables:
+    PLATFORM: ios
+    PROFILE: debug
+  <<: *firebase_upload
+  dependencies:
+    - ios:debug

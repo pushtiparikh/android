@@ -1,0 +1,8 @@
+
+stages:
+  - .pre
+  - test
+  - analyse
+  - archive
+  - deploy
+  - firebase

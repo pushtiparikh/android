@@ -1,0 +1,19 @@
+
+variables:
+  PROJECT_NAME: "<<PROJECT_NAME>>"
+  IOS_PROJECT_NAME: "<<XCODE_WORKSPACE_PROJECT_NAME_GOES_HERE>>"
+  IOS_SCHEME_NAME: "<<XCODE_WORKSPACE_SCHEME_NAME_GOES_HERE>>"
+
+include:
+  - project: sunflowerlab/operations/pipelines
+    ref: reactnative-v1.5
+    file: 'reactnative/stages.yml'
+  - project: sunflowerlab/operations/pipelines
+    ref: reactnative-v1.5
+    file: 'reactnative/analyse.yml'
+  - project: sunflowerlab/operations/pipelines
+    ref: reactnative-v1.5
+    file: 'reactnative/archive.yml'
+  - project: sunflowerlab/operations/pipelines
+    ref: reactnative-v1.5
+    file: 'reactnative/deploy.yml'

@@ -1,0 +1,27 @@
+variables:
+  PROJECT_NAME: "<<PROJECT_NAME>>"
+  ANDROID_COMPILE_SDK: "<<ANDROID_COMPILE_SDK>>"
+  FLAVOR: "<DEFAULT_FLAVOR>"
+
+include:
+  - project: sunflowerlab/operations/pipelines
+    ref: kotlin-v1.3
+    file: 'kotlin/stages.yml'
+  - project: sunflowerlab/operations/pipelines
+    ref: kotlin-v1.3
+    file: 'kotlin/pre.yml'
+  - project: sunflowerlab/operations/pipelines
+    ref: kotlin-v1.3
+    file: 'kotlin/test.yml'
+  - project: sunflowerlab/operations/pipelines
+    ref: kotlin-v1.3
+    file: 'kotlin/analyse.yml'
+  - project: sunflowerlab/operations/pipelines
+    ref: kotlin-v1.3
+    file: 'kotlin/archive.yml'
+  - project: sunflowerlab/operations/pipelines
+    ref: kotlin-v1.3
+    file: 'kotlin/deploy.yml'
+  - project: sunflowerlab/operations/pipelines
+    ref: kotlin-v1.3
+    file: 'kotlin/firebase.yml'

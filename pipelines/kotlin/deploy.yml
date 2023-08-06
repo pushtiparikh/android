@@ -1,0 +1,38 @@
+
+.script: &s3_transfer
+  - export AWS_ACCESS_KEY_ID=`echo ${AWS_ACCESS_KEY_ID_BASE64} | base64 -D`
+  - export AWS_SECRET_ACCESS_KEY=`echo ${AWS_SECRET_ACCESS_KEY_BASE64} | base64 -D`
+  - export S3_ARTIFACT_NAME="${PROJECT_NAME}-${CI_COMMIT_SHORT_SHA}"
+  - export TECHNOLOGY="Kotlin"
+  - cp artifact/*.apk ${S3_ARTIFACT_NAME}.apk
+  - aws s3 cp ${S3_ARTIFACT_NAME}.apk s3://${SFL_BUILD_BUCKET}/${PROJECT_NAME}/${TECHNOLOGY}/${FLAVOR}/${PROFILE}/${S3_ARTIFACT_NAME}.apk
+  - echo "${PROFILE} APK https://${SFL_BUILD_BUCKET}.s3.${AWS_DEFAULT_REGION}.amazonaws.com/${PROJECT_NAME}/${TECHNOLOGY}/${FLAVOR}/${PROFILE}/${S3_ARTIFACT_NAME}.apk"
+
+.job_template: &artifacts_to_s3
+  script:
+    - *s3_transfer
+  tags:
+    - android
+    - kotlin
+  when: manual
+
+s3:debug:
+  stage: deploy
+  variables:
+    PROFILE: Debug
+  <<: *artifacts_to_s3
+  dependencies:
+    - debug
+
+s3:release:
+  stage: deploy
+  variables:
+    PROFILE: Release
+  <<: *artifacts_to_s3
+  dependencies:
+    - release
+  only:
+    refs:
+      - develop
+      - stage
+      - master

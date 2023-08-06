@@ -1,0 +1,113 @@
+
+.script: &sonar |
+  #!/bin/bash
+  getReportTaskFile()
+  {
+    rptfile=
+    if [ -f .sonar/report-task.txt ]; then
+      rptfile=".sonar/report-task.txt"
+    elif [ -f .scannerwork/report-task.txt ]; then
+      rptfile=".scannerwork/report-task.txt"
+    elif [ -f target/sonar/report-task.txt ]; then
+      rptfile="target/sonar/report-task.txt"
+    else 
+      rptfile=`find . -name report-task.txt -print 2>/dev/null`
+    fi
+  }
+
+  getAttributesFromReportTaskFile()
+  {
+    srv=`grep serverUrl ${rptfile} | awk -F= '{print $2}'`
+    ceTaskId=`grep ceTaskId ${rptfile} | awk -F= '{print $2}'`
+    dashboardUrl=`grep dashboardUrl  ${rptfile} | cut -d'=' -f2-`
+  }
+
+  waitForAnalysis()
+  {
+    while [ "$taskstatus" == "PENDING" -o "$taskstatus" == "IN_PROGRESS" ];
+    do 
+      echo Getting task status ...
+      taskstatus=`curl -sS -u ${SONAR_TOKEN}: ${srv}/api/ce/task?id=${ceTaskId} | jq -r .task.status`
+
+      case "$taskstatus" in
+        "PENDING")
+    echo "Scanning Pending";
+    sleep 10;
+    continue;
+    ;;
+        "IN_PROGRESS")
+    echo "Scanning In Progress";
+    sleep 10;
+    continue;
+    ;;
+        "FAILED")
+    echo "Scanning Failed";
+    break;
+    ;;
+        "CANCELLED")
+    echo "Scanning Cancelled";
+    break;
+    ;;
+        "SUCCESS")
+    echo "Scanning Finished";
+    analysisComplete=true;
+    break;
+    ;;
+        "*")
+    echo "Unknown status : $taskstatus";
+    break;
+    ;;
+      esac	
+    done
+
+
+    if [ $analysisComplete == false ]; then
+      echo "Analysis has not been completed..."
+      echo "Cannot get quality gate information .."
+    else
+      aID=`curl -sS -u ${SONAR_TOKEN}: ${srv}/api/ce/task?id=${ceTaskId} | jq .task.analysisId`
+      qurlstr="curl -sS -u ${SONAR_TOKEN}: ${srv}/api/qualitygates/project_status?analysisId=${aID} -o qgate.out"
+      eval ${qurlstr}
+      qgjson=`cat qgate.out`
+      qgstatus=`echo $qgjson | jq -r .projectStatus.status`
+      rm -f qgate.out
+    fi
+  }
+
+  export SONAR_TOKEN=`echo ${SONAR_TOKEN_BASE64} | base64 -D`
+
+  sonar-scanner \
+    -D sonar.host.url=${SONAR_HOST} \
+    -D sonar.login=${SONAR_TOKEN} \
+    -D sonar.projectKey=${PROJECT_NAME}_flutter \
+    -D sonar.projectName=${PROJECT_NAME}_flutter \
+    -D sonar.sourceEncoding=UTF-8 
+
+  getReportTaskFile
+
+  if [ -z $rptfile ]; then
+    echo "No report file found .. Cannot proceed. Aborting ..."
+    exit 1;
+  else
+    getAttributesFromReportTaskFile
+  fi
+
+  taskstatus="PENDING"
+  waitForAnalysis
+
+  echo "Dashboard URL: $dashboardUrl"
+  echo "QUALITY_GATE_STATUS=$qgstatus"
+  if [ "$qgstatus" == "ERROR" ]; then
+    echo "SonarQube QualityGate failed"
+    exit 1;
+  elif [ "$qgstatus" == "SUCCESS" ]; then
+    echo "SonarQube QualityGate succeeded"
+  fi
+
+analyse:
+  stage: analyse
+  script:
+    - *sonar
+  tags:
+    - flutter
+  when: always

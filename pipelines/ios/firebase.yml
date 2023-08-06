@@ -1,0 +1,25 @@
+variables:
+  APP_DISTRIBUTION: "True"
+
+.job_template: &firebase_upload
+  stage: firebase
+  script:
+    - |
+      #!/bin/bash
+      APPLICATION_ID="ios_${FLAVOR}_${PROFILE}"
+      echo "Taking input variable: ${APPLICATION_ID}"
+      firebase appdistribution:distribute artifact/${PROJECT_NAME}-${FLAVOR}-${PROFILE}.ipa --app "${!APPLICATION_ID}" --groups "${TESTER_GROUP}" --release-notes "iOS Debug build" --token "${TOKEN}"
+    - echo "IPA Uploaded with Time Stamp - $(TZ=UTC-5:30 date -R) with Timezone UTC+5:30"
+  only:
+    variables:
+      - $APP_DISTRIBUTION == "True"
+  tags:
+    - ios 
+  when: manual
+
+firebase:ios:debug:
+  variables:
+    PROFILE: debug
+  <<: *firebase_upload
+  dependencies:
+    - ios:debug

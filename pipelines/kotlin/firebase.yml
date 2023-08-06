@@ -1,0 +1,29 @@
+# check this file once
+variables:
+  APP_DISTRIBUTION: "True"
+
+.job_template: &firebase_upload
+  stage: firebase
+  script:
+    - |
+      #!/bin/bash
+      FLAVOR_LOWERCASE=$(echo ${FLAVOR}  | awk '{print tolower($0)}')
+      PROFILE_LOWERCASE=$(echo ${PROFILE}  | awk '{print tolower($0)}')
+      APPLICATION_ID="kotlin_${FLAVOR_LOWERCASE}_${PROFILE}"
+      echo "Taking input variable: ${APPLICATION_ID}"
+      firebase appdistribution:distribute artifact/${PROJECT_NAME}-${FLAVOR}-${PROFILE}.apk --app "${!APPLICATION_ID}" --groups "${TESTER_GROUP}" --release-notes "Kotlin Debug build" --token "${TOKEN}"
+    - echo "APK Uploaded with Time Stamp - $(TZ=UTC-5:30 date -R) with Timezone UTC+5:30"
+  tags:
+    - android
+    - kotlin
+  when: manual
+
+firebase:debug:
+  variables:
+    PROFILE: debug
+  <<: *firebase_upload
+  dependencies:
+    - debug
+  only:
+    variables:
+      - $APP_DISTRIBUTION == "True"

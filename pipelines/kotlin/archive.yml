@@ -1,0 +1,39 @@
+
+.script: &build_profile
+  - echo "Running for Input Flavor - ${FLAVOR} and Profile - ${PROFILE}"
+  - BUILD_ARGS="assemble${FLAVOR}${PROFILE}"
+  - ./gradlew --quiet ${BUILD_ARGS}
+  - PROFILE_LOWERCASE=$(echo ${PROFILE}  | awk '{print tolower($0)}')
+  - cp app/build/outputs/apk/${FLAVOR}/${PROFILE_LOWERCASE}/*.apk artifact/${PROJECT_NAME}-${FLAVOR}-${PROFILE}.apk
+
+.job_template: &android_build
+  stage: archive
+  before_script:
+    - chmod +x ./gradlew
+    - ./gradlew clean
+    - if [ -d "artifact" ]; then rm -rf artifact ; fi && mkdir artifact
+  script:
+    - *build_profile
+  artifacts:
+    paths:
+      - "artifact/*.apk"
+    expire_in: 1 day
+  tags:
+    - android
+    - kotlin
+  when: manual
+
+debug:
+  variables:
+    PROFILE: Debug
+  <<: *android_build
+
+release:
+  variables:
+    PROFILE: Release
+  <<: *android_build
+  only:
+    refs:
+      - develop
+      - stage
+      - master

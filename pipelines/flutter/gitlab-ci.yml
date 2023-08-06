@@ -1,0 +1,21 @@
+variables:
+  PROJECT_NAME: "<<PROJECT_NAME>>"
+  IOS_PROJECT_NAME: "<<XCODE_WORKSPACE_PROJECT_NAME_GOES_HERE>>"
+  FLAVOR: "<<DEFAULT_FLAVOR_GOES_HERE>>"
+
+include:
+  - project: sunflowerlab/operations/pipelines
+    ref: flutter-v1.3
+    file: 'flutter/stages.yml'
+  - project: sunflowerlab/operations/pipelines
+    ref: flutter-v1.3
+    file: 'flutter/analyse.yml'
+  - project: sunflowerlab/operations/pipelines
+    ref: flutter-v1.3
+    file: 'flutter/archive.yml'
+  - project: sunflowerlab/operations/pipelines
+    ref: flutter-v1.3
+    file: 'flutter/deploy.yml'
+  - project: sunflowerlab/operations/pipelines
+    ref: flutter-v1.3
+    file: 'flutter/firebase.yml'

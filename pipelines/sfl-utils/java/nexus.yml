@@ -1,0 +1,64 @@
+.stage: &nexus
+  stage: nexus
+  extends: .template
+  script:
+    - |
+      DEFAULT_DEPLOY_OPTS="CI_DEFAULT_"$BUILD_SYSTEM"_DEPLOY_OPTS"
+      export BUILD_ARGS="${BUILD_ARGS} ${CI_DEPLOY_OPTS:-${!DEFAULT_DEPLOY_OPTS}}"
+      export NEXUS_REPOSITORY="${CI_NEXUS_REPOSITORY:-${CI_DEFAULT_NEXUS_REPOSITORY}}"
+      clog "Running: ${BUILD_WRAPPER} ${BUILD_ARGS}"
+    - eval "${BUILD_WRAPPER} ${BUILD_ARGS}"
+
+.maven-release:
+  variables:
+    CI_DEFAULT_MAVEN_DEPLOY_OPTS: "deploy -Dmaven.test.skip=true"
+    CI_DEFAULT_NEXUS_REPOSITORY: "sunflowerlab-releases"
+  <<: *nexus
+  artifacts:
+    paths:
+      - "target/*RELEASE-dependency.jar"
+    expire_in: 1 day
+  rules:
+    - if: '$CI_COMMIT_REF_NAME == "master"'
+
+.maven-snapshot:
+  variables:
+    CI_DEFAULT_MAVEN_DEPLOY_OPTS: "deploy -Dmaven.test.skip=true"
+    CI_DEFAULT_NEXUS_REPOSITORY: "sunflowerlab-snapshots"
+  <<: *nexus
+  artifacts:
+    paths:
+      - "target/*SNAPSHOT-dependency.jar"
+    expire_in: 1 day
+  rules:
+    - if: '$CI_COMMIT_REF_NAME != "develop"'
+      when: manual
+    - if: '$CI_COMMIT_REF_NAME == "develop"'
+      when: always
+
+.gradle-release:
+  variables:
+    CI_DEFAULT_GRADLE_DEPLOY_OPTS: "TBD"
+    CI_DEFAULT_NEXUS_REPOSITORY: "sunflowerlab-releases"
+  <<: *nexus
+  artifacts:
+    paths:
+      - "target/*RELEASE-dependency.jar"
+    expire_in: 1 day
+  rules:
+    - if: '$CI_COMMIT_REF_NAME != "master"'
+
+.gradle-snapshot:
+  variables:
+    CI_DEFAULT_GRADLE_DEPLOY_OPTS: "TBD"
+    CI_DEFAULT_NEXUS_REPOSITORY: "sunflowerlab-snapshots"
+  <<: *nexus
+  artifacts:
+    paths:
+      - "target/*SNAPSHOT-dependency.jar"
+    expire_in: 1 day
+  rules:
+    - if: '$CI_COMMIT_REF_NAME != "develop"'
+      when: manual
+    - if: '$CI_COMMIT_REF_NAME == "develop"'
+      when: always

@@ -1,0 +1,60 @@
+
+.script: &s3_transfer
+  - export AWS_ACCESS_KEY_ID=`echo ${AWS_ACCESS_KEY_ID_BASE64} | base64 -D`
+  - export AWS_SECRET_ACCESS_KEY=`echo ${AWS_SECRET_ACCESS_KEY_BASE64} | base64 -D`
+  - export TECHNOLOGY="iOS"
+  - export PROFILE_CAMELCASE=$(echo ${PROFILE} | awk '{for(j=1;j<=NF;j++){ $j=toupper(substr($j,1,1)) substr($j,2) }}1')
+  - export FLAVOR_CAMELCASE=$(echo ${FLAVOR} | awk '{for(j=1;j<=NF;j++){ $j=toupper(substr($j,1,1)) substr($j,2) }}1')
+  - export S3_ARTIFACT_NAME="${PROJECT_NAME}-${CI_COMMIT_SHORT_SHA}"
+  - cp artifact/*.ipa ${S3_ARTIFACT_NAME}.ipa
+  - aws s3 cp ${S3_ARTIFACT_NAME}.ipa s3://${SFL_BUILD_BUCKET}/${PROJECT_NAME}/${TECHNOLOGY}/${FLAVOR_CAMELCASE}/${PROFILE_CAMELCASE}/${S3_ARTIFACT_NAME}.ipa
+  - echo "${PROFILE} IPA https://${SFL_BUILD_BUCKET}.s3.${AWS_DEFAULT_REGION}.amazonaws.com/${PROJECT_NAME}/${TECHNOLOGY}/${FLAVOR_CAMELCASE}/${PROFILE_CAMELCASE}/${S3_ARTIFACT_NAME}.ipa"
+  
+.job_template: &artifacts_to_s3
+  script:
+    - *s3_transfer
+  tags:
+    - ios
+  when: manual
+
+s3:debug:
+  stage: deploy
+  variables:
+    PROFILE: debug
+  <<: *artifacts_to_s3
+  dependencies:
+    - ios:debug
+
+s3:release:
+  stage: deploy
+  variables:
+    PROFILE: release
+  <<: *artifacts_to_s3
+  dependencies:
+    - ios:release
+  only:
+    refs:
+      - develop
+      - master
+
+testflight:ios:release:
+  stage: deploy
+  variables:
+    PROFILE: release
+  script:
+    - export IOS_APPSTORE_USERNAME=`echo ${IOS_APP_STORE_USERNAME_BASE64} | base64 -D`
+    - export IOS_APPSTORE_PASSWORD=`echo ${IOS_APP_STORE_PASSWORD_BASE64} | base64 -D`
+    - echo "The version currntly present is:"
+    - xcrun agvtool what-version
+    - xcrun altool --validate-app -f artifact/${PROJECT_NAME}-${FLAVOR}-${PROFILE}.ipa -u ${IOS_APPSTORE_USERNAME} -p ${IOS_APPSTORE_PASSWORD}
+    - xcrun altool --upload-app -f artifact/${PROJECT_NAME}-${FLAVOR}-${PROFILE}.ipa -u ${IOS_APPSTORE_USERNAME} -p ${IOS_APPSTORE_PASSWORD}
+  dependencies:
+    - ios:release
+  tags:
+    - ios
+  only:
+    refs:
+      - develop
+      - master
+      - stage
+  when: manual

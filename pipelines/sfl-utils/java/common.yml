@@ -1,0 +1,19 @@
+.template:
+  variables:
+    CI_DEFAULT_GRADLE_CLI_OPTS: ""
+    CI_DEFAULT_MAVEN_CLI_OPTS: "-s .m2/settings.xml --batch-mode --no-transfer-progress"
+    CI_DEFAULT_GRADLE_GLOBAL_OPTS: ""
+    CI_DEFAULT_MAVEN_GLOBAL_OPTS: "-Dmaven.repo.local=/home/gitlab-runner/.m2/repository"
+    GRADLE_USER_HOME: "/.gradle"
+  before_script:
+    - |
+      #!/bin/bash
+      [[ $BUILD_WRAPPER =~ ./ ]] && chmod +x $BUILD_WRAPPER || :
+      clog () { echo -e "\033[0;35m CI_LOG ${1} \033[0m"; }
+      DEFAULT_CLI_OPTS="CI_DEFAULT_"$BUILD_SYSTEM"_CLI_OPTS"
+      DEFAULT_GLOBAL_OPTS="CI_DEFAULT_"$BUILD_SYSTEM"_GLOBAL_OPTS"
+      export BUILD_ARGS="${CI_CLI_OPTS:-${!DEFAULT_CLI_OPTS}} ${CI_GLOBAL_OPTS:-${!DEFAULT_GLOBAL_OPTS}}"
+      export NEXUS_PASSWORD="$(echo "${NEXUS_PASSWORD_BASE64}" | base64 -d)"
+  needs:
+    - job: detect
+      artifacts: true

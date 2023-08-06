@@ -1,0 +1,81 @@
+
+.script: &certs_and_mobileprovision
+  - export IOS_BUILD_MACHINE_PASSWORD=`echo ${IOS_BUILD_MACHINE_PASSWORD_BASE_64} | base64 -D`
+  - export CERTIFICATE_PASSWORD=`echo ${CERTIFICATE_PASSWORD_BASE64} | base64 -D`
+  - security unlock-keychain -p ${IOS_BUILD_MACHINE_PASSWORD}
+  - security import ci-cd/iOS/*.p12 -k ~/Library/Keychains/login.keychain-db -P ${CERTIFICATE_PASSWORD} -T /usr/bin/codesign
+  - find ci-cd/iOS -name '*.mobileprovision' | cut -d'/' -f3 | tee all_profiles.txt
+  - |
+    PROFILES_FILE="all_profiles.txt"
+    while IFS= read -r PROVISIONING_PROFILE
+    do
+      echo "importing profile: ${PROVISIONING_PROFILE}"
+      uuid=`grep UUID -A1 -a ./ci-cd/iOS/${PROVISIONING_PROFILE} | grep -io "[-A-F0-9]\{36\}"`
+      echo $uuid
+      cp ci-cd/iOS/${PROVISIONING_PROFILE} ~/Library/MobileDevice/Provisioning\ Profiles/$uuid.mobileprovision
+    done < "${PROFILES_FILE}"
+  - rm ${PROFILES_FILE}
+
+.job_template: &android_archive
+  stage: archive
+  before_script:
+    - npm --silent install
+  script:
+    - set +o pipefail
+    - yes | sdkmanager --licenses
+    - set -o pipefail
+    - cd android && chmod +x ./gradlew
+    - ./gradlew --quiet ${BUILD_ARGS}
+  artifacts:
+    paths:
+      - "*/*/*/*/*/*/*.apk"
+    expire_in: 1 day
+  tags:
+    - reactnative
+  when: manual 
+
+.job_template: &ios_archive
+  stage: archive
+  before_script:
+    - npm --silent install
+  script:
+    - *certs_and_mobileprovision
+    - if [ -d archive ]; then rm -rf archive; fi  && mkdir archive
+    - if [ -d artifact ]; then rm -rf artifact; fi  && mkdir artifact
+    - cd ./ios
+    - if [ -f Podfile ]; then
+        pod install;
+        xcodebuild clean archive -quiet -workspace ${IOS_PROJECT_NAME}.xcworkspace -scheme ${IOS_SCHEME_NAME} -archivePath "../archive/${IOS_PROJECT_NAME}.xcarchive";
+      else
+        xcodebuild clean archive -quiet -project ${IOS_PROJECT_NAME}.xcodeproj -scheme ${IOS_SCHEME_NAME} -archivePath "../archive/${IOS_PROJECT_NAME}.xcarchive";
+      fi
+    - cd ..
+    - xcodebuild -quiet -exportArchive -archivePath "archive/${IOS_PROJECT_NAME}.xcarchive" -exportPath artifact/ -exportOptionsPlist ci-cd/iOS/*.plist
+  artifacts:
+    paths:
+      - "artifact/*.ipa"
+    expire_in: 1 day
+  tags:
+    - reactnative
+  when: manual
+
+android:debug:
+  variables:
+    BUILD_ARGS: assembleDebug
+  <<: *android_archive
+
+android:release:
+  variables:
+    BUILD_ARGS: assembleRelease
+  <<: *android_archive
+  only:
+    refs:
+      - develop
+      - master
+
+ios:release: 
+  <<: *ios_archive
+  only:
+    refs:
+      - develop
+      - master

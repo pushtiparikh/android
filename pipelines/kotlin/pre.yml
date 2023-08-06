@@ -1,0 +1,12 @@
+android_dependencies:
+  stage: .pre
+  script:
+    - echo y | sdkmanager --install "extras;android;m2repository" "extras;google;google_play_services" "extras;google;market_apk_expansion" "extras;google;market_licensing" "extras;google;m2repository" "platform-tools" "tools" >/dev/null
+    - echo y | sdkmanager --install "platforms;android-${ANDROID_COMPILE_SDK}" >/dev/null
+    - set +o pipefail
+    - yes | sdkmanager --licenses
+    - set -o pipefail
+  tags:
+    - android
+    - kotlin
+  when: always

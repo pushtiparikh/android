@@ -1,0 +1,14 @@
+# Variables which can be overridden
+# variables:
+#   CI_CLI_OPTS: ""
+#   CI_GLOBAL_OPTS: ""
+#   CI_COMPILE_OPTS: ""
+#   CI_TEST_OPTS: ""
+#   CI_ANALYSIS_OPTS: ""
+#   CI_DEPLOY_OPTS: ""
+#   CI_NEXUS_REPOSITORY: ""
+
+include:
+  - project: sunflowerlab/operations/pipelines
+    ref: latest
+    file: 'sfl-utils/java/pipeline.yml'

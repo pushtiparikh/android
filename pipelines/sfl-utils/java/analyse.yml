@@ -1,0 +1,115 @@
+
+.script: &sonar |
+  #!/bin/bash
+  getReportTaskFile()
+  {
+    rptfile=
+    if [ -f .sonar/report-task.txt ]; then
+      rptfile=".sonar/report-task.txt"
+    elif [ -f .scannerwork/report-task.txt ]; then
+      rptfile=".scannerwork/report-task.txt"
+    elif [ -f target/sonar/report-task.txt ]; then
+      rptfile="target/sonar/report-task.txt"
+    else 
+      rptfile=`find . -name report-task.txt -print 2>/dev/null`
+    fi
+  }
+
+  getAttributesFromReportTaskFile()
+  {
+    srv=`grep serverUrl ${rptfile} | awk -F= '{print $2}'`
+    ceTaskId=`grep ceTaskId ${rptfile} | awk -F= '{print $2}'`
+    dashboardUrl=`grep dashboardUrl  ${rptfile} | cut -d'=' -f2-`
+  }
+
+  waitForAnalysis()
+  {
+    while [ "$taskstatus" == "PENDING" -o "$taskstatus" == "IN_PROGRESS" ];
+    do 
+      clog "Getting task status ..."
+      taskstatus=`curl -sS -u ${SONAR_TOKEN}: ${srv}/api/ce/task?id=${ceTaskId} | jq -r .task.status`
+
+      case "$taskstatus" in
+        "PENDING")
+    clog "Scanning Pending";
+    sleep 10;
+    continue;
+    ;;
+        "IN_PROGRESS")
+    clog "Scanning In Progress";
+    sleep 10;
+    continue;
+    ;;
+        "FAILED")
+    clog "Scanning Failed";
+    break;
+    ;;
+        "CANCELLED")
+    clog "Scanning Cancelled";
+    break;
+    ;;
+        "SUCCESS")
+    clog "Scanning Finished";
+    analysisComplete=true;
+    break;
+    ;;
+        "*")
+    clog "Unknown status : $taskstatus";
+    break;
+    ;;
+      esac	
+    done
+
+
+    if [ $analysisComplete == false ]; then
+      clog "Analysis has not been completed..."
+      clog "Cannot get quality gate information .."
+    else
+      aID=`curl -sS -u ${SONAR_TOKEN}: ${srv}/api/ce/task?id=${ceTaskId} | jq .task.analysisId`
+      qurlstr="curl -sS -u ${SONAR_TOKEN}: ${srv}/api/qualitygates/project_status?analysisId=${aID} -o qgate.out"
+      eval ${qurlstr}
+      qgjson=`cat qgate.out`
+      qgstatus=`echo "${qgjson}" | jq -r .projectStatus.status`
+      rm -f qgate.out
+    fi
+  }
+
+  export SONAR_HOST_URL="${SONAR_HOST}"
+  export SONAR_TOKEN=`echo "${SONAR_TOKEN_BASE64}" | base64 -d`
+
+  DEFAULT_ANALYSIS_OPTS="CI_DEFAULT_"$BUILD_SYSTEM"_ANALYSIS_OPTS"
+  export BUILD_ARGS="${BUILD_ARGS} ${CI_ANALYSIS_OPTS:-${!DEFAULT_ANALYSIS_OPTS}}"
+  clog "Running: ${BUILD_WRAPPER} ${BUILD_ARGS}"
+  eval "${BUILD_WRAPPER} ${BUILD_ARGS}"
+
+  getReportTaskFile
+
+  if [ -z $rptfile ]; then
+    clog "No report file found .. Cannot proceed. Aborting ..."
+    exit 1;
+  else
+    getAttributesFromReportTaskFile
+  fi
+
+  taskstatus="PENDING"
+  waitForAnalysis
+
+  clog "Dashboard URL: $dashboardUrl"
+  clog "QUALITY_GATE_STATUS=$qgstatus"
+  if [ "$qgstatus" == "ERROR" ]; then
+    clog "SonarQube QualityGate failed"
+    exit 1;
+  elif [ "$qgstatus" == "SUCCESS" ]; then
+    clog "SonarQube QualityGate succeeded"
+  fi
+
+analyse:
+  stage: analyse
+  variables:
+    CI_DEFAULT_GRADLE_ANALYSIS_OPTS: "sonarqube"
+    CI_DEFAULT_MAVEN_ANALYSIS_OPTS: "sonar:sonar"
+  extends: .template
+  script:
+    - apt-get update && apt-get install -y --no-install-recommends jq
+    - *sonar
+  when: on_success

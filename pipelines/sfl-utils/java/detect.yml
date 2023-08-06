@@ -1,0 +1,20 @@
+detect:
+  stage: detect
+  script:
+    - clog () { echo -e "\033[0;35m CI_LOG ${1} \033[0m"; }
+    - clog "Detecting build system"
+    - |
+      whoami
+      if [[ -f "pom.xml" || -f "pom.groovy" ]]; then
+        echo "BUILD_SYSTEM=MAVEN" > buildsystem.env
+        [[ -f "mvnw" ]] && echo "BUILD_WRAPPER=./mvnw" >> buildsystem.env || echo "BUILD_WRAPPER=mvn" >> buildsystem.env
+      elif [[ -f "build.gradle" || -f "build.gradle.kts" ]]; then
+        echo "BUILD_SYSTEM=GRADLE" > buildsystem.env
+        [[ -f "gradlew" ]] && echo "BUILD_WRAPPER=./gradlew" >> buildsystem.env || echo "BUILD_WRAPPER=gradle" >> buildsystem.env
+      fi
+      source buildsystem.env
+      clog "Detected build system: ${BUILD_SYSTEM}"
+  artifacts:
+    reports:
+      dotenv: buildsystem.env
+  when: on_success

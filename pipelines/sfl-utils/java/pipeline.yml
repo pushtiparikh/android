@@ -1,0 +1,43 @@
+default:
+  image: openjdk:8u275
+  cache:
+    paths:
+      - target/
+      - build/
+  tags:
+    # - gradle
+    # - java
+    # - maven
+    # - sflutility
+    - java_utilities_runner
+
+stages:
+  - detect
+  - compile
+  - test
+  - analyse
+  # - nexus
+  - deploy
+
+include:
+  - project: sunflowerlab/operations/pipelines
+    ref: util-jar
+    file: 'sfl-utils/java/detect.yml'
+  - project: sunflowerlab/operations/pipelines
+    ref: util-jar
+    file: 'sfl-utils/java/common.yml'
+  - project: sunflowerlab/operations/pipelines
+    ref: util-jar
+    file: 'sfl-utils/java/compile.yml'
+  - project: sunflowerlab/operations/pipelines
+    ref: util-jar
+    file: 'sfl-utils/java/test.yml'
+  - project: sunflowerlab/operations/pipelines
+    ref: util-jar
+    file: 'sfl-utils/java/analyse.yml'
+  - project: sunflowerlab/operations/pipelines
+    ref: util-jar
+    file: 'sfl-utils/java/nexus.yml'
+  - project: sunflowerlab/operations/pipelines
+    ref: util-jar
+    file: 'sfl-utils/java/deploy.yml'

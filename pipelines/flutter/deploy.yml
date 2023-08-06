@@ -1,0 +1,122 @@
+
+.script: &s3_transfer
+  - export AWS_ACCESS_KEY_ID=`echo ${AWS_ACCESS_KEY_ID_BASE64} | base64 -D`
+  - export AWS_SECRET_ACCESS_KEY=`echo ${AWS_SECRET_ACCESS_KEY_BASE64} | base64 -D`
+  - |
+    export FLAVOR_CAMELCASE=$(echo ${FLAVOR} | awk '{for(j=1;j<=NF;j++){ $j=toupper(substr($j,1,1)) substr($j,2) }}1')
+    export S3_ARTIFACT_NAME="${PROJECT_NAME}-${CI_COMMIT_SHORT_SHA}"
+    export OBJECT_PATH="${PROJECT_NAME}/Flutter/${PLATFORM}/${FLAVOR_CAMELCASE}/${PROFILE}"
+  - |
+    cp artifact/*.${TARGET_BUILD} ${S3_ARTIFACT_NAME}.${TARGET_BUILD}
+    aws s3 cp ${S3_ARTIFACT_NAME}.${TARGET_BUILD} s3://${SFL_BUILD_BUCKET}/${OBJECT_PATH}/${S3_ARTIFACT_NAME}.${TARGET_BUILD}
+    echo "${FLAVOR_CAMELCASE} ${PROFILE} build ${TARGET_BUILD} : https://${SFL_BUILD_BUCKET}.s3.${AWS_DEFAULT_REGION}.amazonaws.com/${OBJECT_PATH}/${S3_ARTIFACT_NAME}.${TARGET_BUILD}"
+
+.job_template: &artifacts_to_s3
+  stage: deploy
+  script:
+    - *s3_transfer
+  tags:
+    - flutter 
+  when: manual
+
+s3:android:debug:
+  variables:
+    PLATFORM: Android
+    TARGET_BUILD: apk
+    PROFILE: Debug
+  <<: *artifacts_to_s3
+  dependencies:
+    - android:debug
+
+s3:appbundle:debug:
+  variables:
+    PLATFORM: Android
+    TARGET_BUILD: aab
+    PROFILE: Debug
+  <<: *artifacts_to_s3
+  dependencies:
+    - appbundle:debug
+
+s3:android:release:
+  variables:
+    PLATFORM: Android
+    TARGET_BUILD: apk
+    PROFILE: Release
+  <<: *artifacts_to_s3
+  dependencies:
+    - android:release
+  only:
+    refs:
+      - develop
+      - stage
+      - master
+      - Retainer_1.0
+      - feature
+
+s3:appbundle:release:
+  variables:
+    PLATFORM: Android
+    TARGET_BUILD: aab
+    PROFILE: Release
+  <<: *artifacts_to_s3
+  dependencies:
+    - appbundle:release
+  only:
+    refs:
+      - develop
+      - stage
+      - master
+      - Retainer_1.0
+      - feature
+
+s3:ios:debug:
+  variables:
+    PLATFORM: iOS
+    TARGET_BUILD: ipa
+    PROFILE: Debug
+  <<: *artifacts_to_s3
+  dependencies:
+    - ios:debug
+
+s3:ios:release:
+  variables:
+    PLATFORM: iOS
+    TARGET_BUILD: ipa
+    PROFILE: Release
+  <<: *artifacts_to_s3
+  dependencies:
+    - ios:release
+  only:
+    refs:
+      - develop
+      - stage
+      - master
+      - Retainer_1.0
+      - feature
+
+testflight:ios:release:
+  stage: deploy
+  variables:
+    PROFILE: release
+  script:
+    - export IOS_APPSTORE_USERNAME=`echo ${IOS_APP_STORE_USERNAME_BASE64} | base64 -D`
+    - export IOS_APPSTORE_PASSWORD=`echo ${IOS_APP_STORE_PASSWORD_BASE64} | base64 -D`
+    - cd ios
+    - echo "The version currntly present is:"
+    - xcrun agvtool what-version
+    - if [ -f pubspec.yaml ]; then cat pubspec.yaml | grep "version:"; fi
+    - cd ..
+    - xcrun altool --validate-app -f artifact/${PROJECT_NAME}-${FLAVOR}-${PROFILE}.ipa -u ${IOS_APPSTORE_USERNAME} -p ${IOS_APPSTORE_PASSWORD}
+    - xcrun altool --upload-app -f artifact/${PROJECT_NAME}-${FLAVOR}-${PROFILE}.ipa -u ${IOS_APPSTORE_USERNAME} -p ${IOS_APPSTORE_PASSWORD}
+  dependencies:
+    - ios:release
+  tags:
+    - flutter
+  only:
+    refs:
+      - develop
+      - stage
+      - master
+      - Retainer_1.0
+      - feature
+  when: manual

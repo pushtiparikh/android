@@ -1,0 +1,72 @@
+
+.script: &s3_transfer
+  - export AWS_ACCESS_KEY_ID=`echo ${AWS_ACCESS_KEY_ID_BASE64} | base64 -D`
+  - export AWS_SECRET_ACCESS_KEY=`echo ${AWS_SECRET_ACCESS_KEY_BASE64} | base64 -D`
+  - export TECHNOLOGY="ReactNative"
+  - export S3_ARTIFACT_NAME="${PROJECT_NAME}-${CI_COMMIT_SHORT_SHA}"
+  - |
+    if [ "$PLATFORM" = "Android" ]; then
+      cp android/app/build/outputs/apk/${PROFILE}/app-${PROFILE}.apk ${S3_ARTIFACT_NAME}.apk
+      aws s3 cp ${S3_ARTIFACT_NAME}.apk s3://${SFL_BUILD_BUCKET}/${PROJECT_NAME}/${TECHNOLOGY}/${PLATFORM}/${PROFILE}/${S3_ARTIFACT_NAME}.apk
+      echo "${PROFILE} APK is: https://${SFL_BUILD_BUCKET}.s3.${AWS_DEFAULT_REGION}.amazonaws.com/${PROJECT_NAME}/${TECHNOLOGY}/${PLATFORM}/${PROFILE}/${S3_ARTIFACT_NAME}.apk"
+    fi
+    if [ "$PLATFORM" = "iOS" ]; then
+      cd artifact
+      cp ${PROJECT_NAME}.ipa ${S3_ARTIFACT_NAME}.ipa
+      aws s3 cp ${S3_ARTIFACT_NAME}.ipa s3://${SFL_BUILD_BUCKET}/${PROJECT_NAME}/${TECHNOLOGY}/${PLATFORM}/${PROFILE}/${S3_ARTIFACT_NAME}.ipa
+      echo "${PROFILE} IPA is: https://${SFL_BUILD_BUCKET}.s3.${AWS_DEFAULT_REGION}.amazonaws.com/${PROJECT_NAME}/${TECHNOLOGY}/${PLATFORM}/${PROFILE}/${S3_ARTIFACT_NAME}.ipa"
+    fi
+
+.job_template: &artifacts_to_s3
+  script:
+    - *s3_transfer
+  tags:
+    - reactnative
+  when: manual
+
+s3:android:debug:
+  stage: deploy
+  variables:
+    PLATFORM: Android
+    PROFILE: Debug
+  <<: *artifacts_to_s3
+  dependencies:
+    - android:debug
+
+s3:android:release:
+  stage: deploy
+  variables:
+    PLATFORM: Android
+    PROFILE: Release
+  <<: *artifacts_to_s3
+  dependencies:
+    - android:release
+  only:
+    refs:
+      - develop
+      - master
+
+s3:ios:release:
+  stage: deploy
+  variables:
+    PLATFORM: iOS
+    PROFILE: Release
+  <<: *artifacts_to_s3
+  dependencies:
+    - ios:release
+  only:
+    refs:
+      - develop
+      - master
+
+#testflight:ios:release
+.hidden_job:
+  stage: deploy
+  script:
+    - export IOS_APPSTORE_USERNAME=`echo ${IOS_APP_STORE_USERNAME_BASE64} | base64 -D`
+    - export IOS_APPSTORE_PASSWORD=`echo ${IOS_APP_STORE_PASSWORD_BASE64} | base64 -D`
+    - cd ios/
+    - xcrun altool --upload-app -f artifact/$IOS_PROJECT_NAME.ipa -u ${IOS_APPSTORE_USERNAME} -p ${IOS_APPSTORE_PASSWORD}
+  tags:
+    - reactnative
+  when: manual

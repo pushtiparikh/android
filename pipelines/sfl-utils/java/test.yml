@@ -1,0 +1,18 @@
+test:
+  stage: test
+  variables:
+    CI_DEFAULT_GRADLE_TEST_OPTS: "test"
+    CI_DEFAULT_MAVEN_TEST_OPTS: "test"
+  extends: .template
+  script:
+    - |
+      DEFAULT_TEST_OPTS="CI_DEFAULT_"$BUILD_SYSTEM"_TEST_OPTS"
+      export BUILD_ARGS="${BUILD_ARGS} ${CI_TEST_OPTS:-${!DEFAULT_TEST_OPTS}}"
+      clog "Running: ${BUILD_WRAPPER} ${BUILD_ARGS}"
+    - eval "${BUILD_WRAPPER} ${BUILD_ARGS}"
+  artifacts:
+    when: always
+    reports:
+      junit:
+        - target/surefire-reports/TEST-*.xml
+  when: on_success

@@ -1,0 +1,133 @@
+
+.script: &certs_and_mobileprovision
+  - export CERTIFICATE_DIRECTORY="ci-cd/iOS/certificates"
+  - export PROVISIONING_PROFILE_DIRECTORY="ci-cd/iOS/provisioningprofiles"
+  - export PLIST_DIRECTORY="ci-cd/iOS/${FLAVOR}/${PROFILE}"
+  - export IOS_BUILD_MACHINE_PASSWORD=`echo ${IOS_BUILD_MACHINE_PASSWORD_BASE_64} | base64 -D`
+  - export CERTIFICATE_PASSWORD=`echo ${CERTIFICATE_PASSWORD_BASE64} | base64 -D`
+  - security unlock-keychain -p ${IOS_BUILD_MACHINE_PASSWORD}
+  - security import ${CERTIFICATE_DIRECTORY}/*.p12 -k ~/Library/Keychains/login.keychain-db -P ${CERTIFICATE_PASSWORD} -T /usr/bin/codesign
+  - find ${PROVISIONING_PROFILE_DIRECTORY} -name '*.mobileprovision' | cut -d'/' -f4 | tee all_profiles.txt
+  - |
+    PROFILES_FILE="all_profiles.txt"
+    while IFS= read -r PROVISIONING_PROFILE
+    do
+      echo "importing profile: ${PROVISIONING_PROFILE}"
+      uuid=`grep UUID -A1 -a ${PROVISIONING_PROFILE_DIRECTORY}/${PROVISIONING_PROFILE} | grep -io "[-A-F0-9]\{36\}"`
+      echo $uuid
+      cp ${PROVISIONING_PROFILE_DIRECTORY}/${PROVISIONING_PROFILE} ~/Library/MobileDevice/Provisioning\ Profiles/$uuid.mobileprovision
+    done < "${PROFILES_FILE}"
+  - rm ${PROFILES_FILE}
+
+.job_template: &android_archive
+  stage: archive
+  before_script:
+    - fvm flutter packages get
+    - fvm flutter clean
+  script:
+    - echo "Running for Input Flavor - ${FLAVOR} and Profile - ${PROFILE}"
+    - set +o pipefail
+    - yes | sdkmanager --licenses
+    - set -o pipefail
+    - if [ -d "artifact" ]; then rm -rf artifact ; fi && mkdir artifact
+    - |
+      if [ "${TARGET_BUILD}" = "apk" ]; then
+        fvm flutter build apk --flavor ${FLAVOR} --${PROFILE}
+        mv build/app/outputs/apk/${FLAVOR}/${PROFILE}/*.apk artifact/${PROJECT_NAME}-${FLAVOR}-${PROFILE}.apk
+      elif [ "${TARGET_BUILD}" = "aab" ]; then
+        export PROFILE_CAMELCASE=$(echo ${PROFILE} | awk '{for(j=1;j<=NF;j++){ $j=toupper(substr($j,1,1)) substr($j,2) }}1')
+        fvm flutter build appbundle --flavor ${FLAVOR} --${PROFILE}
+        mv build/app/outputs/bundle/${FLAVOR}${PROFILE_CAMELCASE}/*.aab artifact/${PROJECT_NAME}-${FLAVOR}-${PROFILE}.aab
+      fi
+  artifacts:
+    paths:
+      - "artifact/*.*"
+    expire_in: 1 day
+  tags:
+    - flutter
+  when: manual
+
+.job_template: &ios_archive
+  stage: archive
+  before_script:
+    - fvm flutter packages get
+    - fvm flutter clean
+  script:
+    - echo "Running for scheme - ${FLAVOR} and build mode ${PROFILE}"
+    - *certs_and_mobileprovision
+    - pod repo update  
+    - fvm flutter build ios --flavor ${FLAVOR}
+    - if [ -d archive ]; then rm -rf archive; fi  && mkdir archive
+    - if [ -d artifact ]; then rm -rf artifact; fi  && mkdir artifact
+    - cd ios
+    - if [ -f Podfile ]; then
+        pod install;
+        xcodebuild clean archive -quiet -workspace ${IOS_PROJECT_NAME}.xcworkspace -scheme ${FLAVOR} -destination 'generic/platform=iOS' -archivePath "../archive/${IOS_PROJECT_NAME}.xcarchive";
+      else
+        xcodebuild clean archive -quiet -project ${IOS_PROJECT_NAME}.xcodeproj -scheme ${FLAVOR} -destination 'generic/platform=iOS' -archivePath "../archive/${IOS_PROJECT_NAME}.xcarchive";
+      fi
+    - cd ..
+    - xcodebuild -quiet -exportArchive -destination 'generic/platform=iOS' -archivePath "archive/${IOS_PROJECT_NAME}.xcarchive" -exportPath artifact/ -exportOptionsPlist ${PLIST_DIRECTORY}/*.plist
+    - mv artifact/*.ipa artifact/${PROJECT_NAME}-${FLAVOR}-${PROFILE}.ipa
+  artifacts:
+    paths:
+      - "artifact/*.ipa"
+    expire_in: 1 day
+  tags:
+    - flutter
+  when: manual
+
+android:debug:
+  variables:
+    TARGET_BUILD: apk
+    PROFILE: debug
+  <<: *android_archive
+
+appbundle:debug:
+  variables:
+    TARGET_BUILD: aab
+    PROFILE: debug
+  <<: *android_archive
+
+android:release:
+  variables:
+    TARGET_BUILD: apk
+    PROFILE: release
+  <<: *android_archive
+  only:
+    refs:
+      - develop
+      - stage
+      - master
+      - Retainer_1.0
+      - feature
+
+appbundle:release:
+  variables:
+    TARGET_BUILD: aab
+    PROFILE: release
+  <<: *android_archive
+  only:
+    refs:
+      - develop
+      - stage
+      - master
+      - Retainer_1.0
+      - feature
+
+ios:debug:
+  variables:
+    PROFILE: debug
+  <<: *ios_archive
+
+ios:release:
+  variables:
+    PROFILE: release
+  <<: *ios_archive
+  only:
+    refs:
+      - develop
+      - stage
+      - master
+      - Retainer_1.0
+      - feature

@@ -1,0 +1,13 @@
+compile:
+  stage: compile
+  variables:
+    CI_DEFAULT_GRADLE_COMPILE_OPTS: "compileJava"
+    CI_DEFAULT_MAVEN_COMPILE_OPTS: "compile"
+  extends: .template
+  script:
+    - |
+      DEFAULT_COMPILE_OPTS="CI_DEFAULT_"$BUILD_SYSTEM"_COMPILE_OPTS"
+      export BUILD_ARGS="${BUILD_ARGS} ${CI_COMPILE_OPTS:-${!DEFAULT_COMPILE_OPTS}}"
+      clog "Running: ${BUILD_WRAPPER} ${BUILD_ARGS}"
+    - eval "${BUILD_WRAPPER} ${BUILD_ARGS}"
+  when: always

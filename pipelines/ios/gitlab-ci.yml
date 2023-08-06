@@ -1,0 +1,21 @@
+variables:
+  PROJECT_NAME: "<<PROJECT_NAME>>"
+  IOS_PROJECT_NAME: "<<XCODE_WORKSPACE_PROJECT_NAME_GOES_HERE>>"
+  FLAVOR: "<<DEFAULT_FLAVOR_GOES_HERE>>"
+
+include:
+  - project: sunflowerlab/operations/pipelines
+    ref: ios-v1.5
+    file: 'ios/stages.yml'
+  - project: sunflowerlab/operations/pipelines
+    ref: ios-v1.5
+    file: 'ios/analyse.yml'
+  - project: sunflowerlab/operations/pipelines
+    ref: ios-v1.5
+    file: 'ios/archive.yml'
+  - project: sunflowerlab/operations/pipelines
+    ref: ios-v1.5
+    file: 'ios/deploy.yml'
+  - project: sunflowerlab/operations/pipelines
+    ref: ios-v1.5
+    file: 'ios/firebase.yml'

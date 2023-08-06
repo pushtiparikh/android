@@ -1,0 +1,6 @@
+
+stages:
+  - .pre
+  - analyse
+  - archive
+  - deploy

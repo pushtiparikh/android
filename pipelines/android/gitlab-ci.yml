@@ -1,0 +1,20 @@
+variables:
+  PROJECT_NAME: "<<PROJECT_NAME>>"
+  ANDROID_COMPILE_SDK: "<<ANDROID_COMPILE_SDK>>"
+
+include:
+  - project: sunflowerlab/operations/pipelines
+    ref: android-v1.2
+    file: 'android/stages.yml'
+  - project: sunflowerlab/operations/pipelines
+    ref: android-v1.2
+    file: 'android/pre.yml'
+  - project: sunflowerlab/operations/pipelines
+    ref: android-v1.2
+    file: 'android/analyse.yml'
+  - project: sunflowerlab/operations/pipelines
+    ref: android-v1.2
+    file: 'android/archive.yml'
+  - project: sunflowerlab/operations/pipelines
+    ref: android-v1.2
+    file: 'android/deploy.yml'

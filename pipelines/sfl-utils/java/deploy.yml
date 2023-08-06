@@ -1,0 +1,37 @@
+deploy-package:
+  stage: deploy
+  variables:
+    # CI_DEFAULT_GRADLE_PACKAGE_OPTS: "compileJava"
+    CI_DEFAULT_MAVEN_PACKAGE_OPTS: "spring-boot:build-image -Dmaven.test.skip=true"
+  extends: .template
+  script:
+    - |
+      DEFAULT_PACKAGE_OPTS="CI_DEFAULT_"$BUILD_SYSTEM"_PACKAGE_OPTS"
+      export BUILD_ARGS="${BUILD_ARGS} ${CI_PACKAGE_OPTS:-${!DEFAULT_PACKAGE_OPTS}}"
+      clog "Running: ${BUILD_WRAPPER} ${BUILD_ARGS}"
+    - eval "${BUILD_WRAPPER} ${BUILD_ARGS}"
+    - |
+      # echo "Uploading artifacts to S3"
+      # export AWS_ACCESS_KEY_ID=`echo ${AWS_ACCESS_KEY_ID_BASE64} | base64 -d`
+      # export AWS_SECRET_ACCESS_KEY=`echo ${AWS_SECRET_ACCESS_KEY_BASE64} | base64 -d`
+      # echo ${AWS_DEFAULT_REGION}
+
+      mkdir ${PROJECT_NAME}
+      #cp target/*.war ${PROJECT_NAME}/ROOT.war
+      cp -r ci-cd/docker/* ${PROJECT_NAME}/ 
+      chmod a+x ${PROJECT_NAME}/deploy.sh
+      sh ${PROJECT_NAME}/deploy.sh ${PROJECT_NAME}/ ${API_PORT} ${HOST_PORT}
+
+      # aws s3 sync artifacts/ s3://${S3_JAVA_BUCKET}/${PROJECT_NAME}
+      # chmod 400 ci-cd/aws/*.pem
+      # ssh -i ci-cd/aws/${PEM_NAME} -o "StrictHostKeyChecking no" ${SERVER_USER}@${SERVER_SSH_URL} \
+      # mkdir ${PROJECT_NAME}
+      # ssh -i ci-cd/aws/${PEM_NAME} -o "StrictHostKeyChecking no" ${SERVER_USER}@${SERVER_SSH_URL} \
+      # aws s3 sync s3://${S3_JAVA_BUCKET}/${PROJECT_NAME} /home/${SERVER_USER}/${PROJECT_NAME}
+      # ssh -i ci-cd/aws/${PEM_NAME} -o "StrictHostKeyChecking no" ${SERVER_USER}@${SERVER_SSH_URL} \
+      # ssh -i ci-cd/aws/${PEM_NAME} -o "StrictHostKeyChecking no" ${SERVER_USER}@${SERVER_SSH_URL} \
+
+      
+  when: manual
+  tags: 
+    - java_utilities_runner
